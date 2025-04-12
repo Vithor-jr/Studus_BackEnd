@@ -10,6 +10,7 @@ import { LoginValidationMiddleware } from './middlewares/login-validation.middle
 import { PrismaModule } from 'src/prisma/prisma.module';
 import { PasswordResetModule } from 'src/password-reset/password-reset.module';
 
+
 @Module({
   imports: [
     PasswordResetModule,

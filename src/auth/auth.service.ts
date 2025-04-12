@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import { UnauthorizedError } from './errors/unauthorized.error';
@@ -6,42 +6,57 @@ import { User } from '../user/entities/user.entity';
 import { UserService } from '../user/user.service';
 import { UserPayload } from './models/UserPayload';
 import { UserToken } from './models/UserToken';
+import { LoginDto } from './dto/login.dto';
+import { PrismaService } from 'src/prisma/prisma.service';
 
 @Injectable()
 export class AuthService {
   constructor(
+    private readonly prisma: PrismaService,
     private readonly jwtService: JwtService,
     private readonly userService: UserService,
   ) {}
 
-  async login(user: User): Promise<UserToken> {
+  async login(loginDto: LoginDto): Promise<UserToken> {
+    const { email, password } = loginDto;
+  
+    const user = await this.prisma.user.findUnique({ where: { email } });
+  
+    if (!user) {
+      throw new UnauthorizedException('Credenciais inválidas');
+    }
+
+    const isPasswordValid = await bcrypt.compare(password, user.password);
+    if (!isPasswordValid) {
+      throw new UnauthorizedException('Credenciais inválidas');
+    }
+  
     const payload: UserPayload = {
       sub: user.id,
-      email: user.email,
+      email: user.email.toLowerCase(),
       name: user.name,
+      username: user.username,
+      phone: user.phone,
     };
-
+  
     return {
       access_token: this.jwtService.sign(payload),
     };
   }
+  
 
   async updatePassword(email: string, newPassword: string): Promise<void> {
-    const user = await this.userService.findByEmail(email);
+    const user = await this.userService.findByEmail(email.toLowerCase());
   
     if (!user) {
-      // Trate o caso em que o usuário não existe
       throw new UnauthorizedError('Usuário não encontrado.');
     }
   
-    // Atualize a senha no banco de dados
     await this.userService.updatePassword(user.id, newPassword);
   }
   
   async validateUser(email: string, password: string): Promise<User> {
-    const user = await this.userService.findByEmail(email);
-    console.log(`Senha do usuário obtida do banco de dados: ${user.password}`);
-    console.log(`Senha fornecida durante o login: ${password}`);
+    const user = await this.userService.findByEmail(email.toLowerCase());
   
     if (user) {
       const isPasswordValid = await bcrypt.compare(password, user.password);
@@ -50,6 +65,7 @@ export class AuthService {
       if (isPasswordValid) {
         return {
           ...user,
+          email:user.email.toLowerCase(),
           password: undefined,
         };
       }

@@ -1,9 +1,11 @@
 // This is your Prisma schema file,
 // learn more about it in the docs: https://pris.ly/d/prisma-schema
 
+
 datasource db {
-  provider = "mysql"
-  url      = env("DATABASE_URL")
+  provider = "postgresql"
+  url = env("POSTGRES_PRISMA_URL") // uses connection pooling
+  directUrl = env("POSTGRES_URL_NON_POOLING") // uses a direct connection
 }
 
 generator client {
@@ -11,12 +13,89 @@ generator client {
 }
 
 model User {
-  id Int @id @default(autoincrement())
+  id             Int    @id @default(autoincrement())
+  email          String @unique
+  googleId       String? @unique
+  password       String
+  name           String
+  username       String
+  photoUrl       String?
+  phone          String @unique
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  conversation   Conversation[]
+  userProgress   UserProgress[]
+  passwordResets PasswordReset[]
+  mood           DailyMood[]
+  studySession   StudySession[]
+  activities     Activity[]
+  categories     Category[]
+}
 
-  email    String @unique
-  password String
+enum Mood {
+  FELIZ
+  NEUTRO
+  RAIVA
+  TRISTE
+}
 
-  name String
+model Conversation {
+  id        Int       @id @default(autoincrement())
+  title     String?
+  userId    Int
+  user      User      @relation(fields: [userId], references: [id])
+  messages  Message[]
+  createdAt DateTime  @default(now())
+}
+
+model Message {
+  id             Int       @id @default(autoincrement())
+  conversationId Int
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  role           String 
+  content        String
+  createdAt      DateTime @default(now())
+}
+
+
+model DailyMood {
+  id        Int      @id @default(autoincrement())
+  date      DateTime @default(now())
+  mood      Mood
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id])
+}
+
+model StudySession {
+  id         Int  @id @default(autoincrement())
+  name       String
+  categoryId Int
+  duration   Int 
+  startAt    DateTime?
+  endAt      DateTime?
+  userId     Int
+  category   Category  @relation(fields: [categoryId], references: [id])
+  user       User      @relation(fields: [userId], references: [id])
+}
+
+model Topic {
+  id           Int        @id @default(autoincrement())
+  name         String
+  discipline   String
+  important    Boolean    @default(false)
+  vestibular   String
+  userProgress UserProgress[]
+}
+
+model UserProgress {
+  id       Int    @id @default(autoincrement())
+  userId   Int
+  topicId  Int
+  checked  Boolean @default(false)
+  user     User    @relation(fields: [userId], references: [id])
+  topic    Topic   @relation(fields: [topicId], references: [id])
+
+   @@unique([userId, topicId])
 }
 
 model PasswordReset {
@@ -24,5 +103,32 @@ model PasswordReset {
   email     String
   code      String
   expiresAt DateTime
+  userId    Int
+  user      User      @relation(fields: [userId], references: [id])
+}
+
+model Activity {
+  id          Int    @id @default(autoincrement())
+  name        String
+  important   Boolean @default(false)
+  categoryId  Int
+  userId      Int
+  completed   Boolean  @default(false)
+  category    Category @relation(fields: [categoryId], references: [id])
+  type        String
+  dueDate     DateTime
+  completedAt DateTime?
+  user        User   @relation(fields: [userId], references: [id])
+}
+
+model Category {
+  id        Int       @id @default(autoincrement())
+  name      String
+  color     String
+  isDefault Boolean   @default(false)
+  activities Activity[]
+  sessions StudySession[]
+  userId    Int
+  user      User?      @relation(fields: [userId], references: [id])
 }
 
